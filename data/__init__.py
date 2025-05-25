@@ -4,7 +4,7 @@ from data.base import *
 from data.cityscapes_loader import cityscapesLoader
 from data.gta5_dataset import GTA5DataSet
 from data.synthia_dataset import SynthiaDataSet
-
+from data.loveda_dataset import LoveDADataSet, LoveDADomainDataSet
 
 def get_loader(name):
     """get_loader
@@ -13,7 +13,7 @@ def get_loader(name):
     return {
         "cityscapes": cityscapesLoader,
         "gta": GTA5DataSet,
-        "synthia": SynthiaDataSet
+        "synthia": SynthiaDataSet,
     }[name]
 
 def get_data_path(name):

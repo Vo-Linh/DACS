@@ -1,0 +1,72 @@
+{
+    "model": "DeepLab",
+    "dataset": "loveda",
+    "source_domain": "Urban",
+    "target_domain": "Rural",
+  
+    "training": {
+      "batch_size": 2,
+      "num_workers": 4,
+      "optimizer": "SGD",
+      "momentum": 0.9,
+      "num_iterations": 100000,
+      "learning_rate": 2.5e-4,
+      "lr_schedule": "Poly",
+      "lr_schedule_power": 0.9,
+      "weight_decay": 5e-4,
+      "use_sync_batchnorm": true,
+  
+      "data": {
+        "split_id_list": 0,
+        "labeled_samples": 0,
+        "input_size": "512,512",
+        "scale": false,
+        "crop": true,
+        "loveda_root": "./data/LoveDA"
+      },
+      
+      "unlabeled": {
+        "train_unlabeled": true,
+        "consistency_weight": 1,
+        "consistency_loss": "CE",
+        "pixel_weight": "threshold_uniform",
+        "mix_mask": "class",
+        "flip": false,
+        "color_jitter": true,
+        "blur": true
+      }
+    },
+    
+    "model_params": {
+      "num_classes": 7,
+      "pretrained_backbone": true
+    },
+  
+    "seed": 1,
+    "pretrained": "imagenet",
+    "ignore_label": 255,
+  
+    "utils": {
+      "save_checkpoint_every": 2000,
+      "checkpoint_dir": "../saved/DeepLabv2_LoveDA",
+      "val_per_iter": 2000,
+      "tensorboard": true,
+      "log_per_iter": 100,
+      "save_best_model": true
+    },
+  
+    "loveda": {
+      "class_names": [
+        "Background",
+        "Building", 
+        "Road",
+        "Water",
+        "Barren",
+        "Forest",
+        "Agricultural"
+      ],
+      "class_weights": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+      "mean": [123.675, 116.28, 103.53],
+      "std": [58.395, 57.12, 57.375]
+    }
+  }
