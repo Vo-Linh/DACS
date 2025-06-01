@@ -3,10 +3,10 @@
     "dataset": "loveda",
     "source_domain": "Urban",
     "target_domain": "Rural",
-  
+
     "training": {
       "batch_size": 2,
-      "num_workers": 4,
+      "num_workers": 1,
       "optimizer": "SGD",
       "momentum": 0.9,
       "num_iterations": 100000,
@@ -22,7 +22,7 @@
         "input_size": "512,512",
         "scale": false,
         "crop": true,
-        "loveda_root": "./data/LoveDA"
+        "loveda_root": "/home/Hung_Data/HungData/mmseg_data/Datasets/LoveDA/loveDA/"
       },
       
       "unlabeled": {
@@ -43,13 +43,13 @@
     },
   
     "seed": 1,
-    "pretrained": "imagenet",
-    "ignore_label": 255,
+    "pretrained": "coco",
+    "ignore_label": -1,
   
     "utils": {
       "save_checkpoint_every": 2000,
-      "checkpoint_dir": "../saved/DeepLabv2_LoveDA",
-      "val_per_iter": 2000,
+      "checkpoint_dir": "checkpoint/LoveDA-U2R",
+      "val_per_iter": 1000,
       "tensorboard": true,
       "log_per_iter": 100,
       "save_best_model": true

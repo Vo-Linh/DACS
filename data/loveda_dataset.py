@@ -1,6 +1,7 @@
 import os
 import os.path as osp
 import numpy as np
+from skimage.io import imread
 import random
 import matplotlib.pyplot as plt
 import collections
@@ -96,20 +97,20 @@ class LoveDADataSet(data.Dataset):
         return len(self.img_files)
 
     def __getitem__(self, index):
+        """
+        Reference from https://github.com/Junjue-Wang/LoveDA/blob/master/Unsupervised_Domian_Adaptation/data/loveda.py
+        """
         datafiles = self.img_files[index]
         
         # Load image and mask
-        image = Image.open(datafiles["img"]).convert('RGB')
-        mask = Image.open(datafiles["mask"])
+        image = imread(datafiles["img"])
+        mask = imread(datafiles["mask"]).astype(np.int32) - 1
+
         name = datafiles["name"]
         
         # Resize
-        image = image.resize(self.img_size, Image.BICUBIC)
-        mask = mask.resize(self.img_size, Image.NEAREST)
-        
-        # Convert to numpy arrays
-        image = np.asarray(image, np.uint8)
-        mask = np.asarray(mask, np.uint8)
+        image = np.resize(image, (self.img_size[0], self.img_size[0], 3))
+        mask = np.resize(mask, self.img_size)
         
         # Apply augmentations if provided
         if self.augmentations is not None:
@@ -117,7 +118,6 @@ class LoveDADataSet(data.Dataset):
             
         # Convert to float
         image = np.asarray(image, np.float32)
-        mask = np.asarray(mask, np.float32)
         
         # Store original size
         size = image.shape

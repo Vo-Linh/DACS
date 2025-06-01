@@ -112,13 +112,23 @@ def get_iou(data_list, class_num, dataset, save_path=None):
 
     aveJ, j_list, M = ConfM.jaccard()
 
-    classes = np.array(("road", "sidewalk",
-        "building", "wall", "fence", "pole",
-        "traffic_light", "traffic_sign", "vegetation",
-        "terrain", "sky", "person", "rider",
-        "car", "truck", "bus",
-        "train", "motorcycle", "bicycle"))
-
+    if dataset == 'cityscapes':
+        classes = np.array(("road", "sidewalk",
+            "building", "wall", "fence", "pole",
+            "traffic_light", "traffic_sign", "vegetation",
+            "terrain", "sky", "person", "rider",
+            "car", "truck", "bus",
+            "train", "motorcycle", "bicycle"))
+    elif dataset == 'loveda':
+        classes = np.array((
+            "background",    # 0
+            "building",      # 1
+            "road",          # 2
+            "water",         # 3
+            "barren",        # 4
+            "forest",        # 5
+            "agriculture",   # 6
+        ))
 
     for i, iou in enumerate(j_list):
         print('class {:2d} {:12} IU {:.2f}'.format(i, classes[i], 100*j_list[i]))
@@ -140,7 +150,6 @@ def evaluate(model, dataset, ignore_label=250, save_output_images=False, save_di
         test_dataset = data_loader( data_path, img_size=input_size, img_mean = IMG_MEAN, is_transform=True, split='val')
         testloader = data.DataLoader(test_dataset, batch_size=1, shuffle=False, pin_memory=True)
         interp = nn.Upsample(size=input_size, mode='bilinear', align_corners=True)
-        ignore_label = 250
 
     elif dataset == 'gta':
         num_classes = 19
@@ -149,8 +158,15 @@ def evaluate(model, dataset, ignore_label=250, save_output_images=False, save_di
         test_dataset = data_loader(data_path, list_path = './data/gta5_list/train.txt', img_size=(1280,720), mean=IMG_MEAN)
         testloader = data.DataLoader(test_dataset, batch_size=1, shuffle=True, pin_memory=True)
         interp = nn.Upsample(size=(720,1280), mode='bilinear', align_corners=True)
-        ignore_label = 255
-
+        
+    elif dataset == 'loveda':
+        num_classes = 7
+        data_loader = get_loader('loveda')
+        data_path = get_data_path('loveda')
+        test_dataset = data_loader(data_path,domain='Rural', split='Val', img_size=input_size)
+        testloader = data.DataLoader(test_dataset, batch_size=1, shuffle=False, pin_memory=True)
+        interp = nn.Upsample(size=input_size, mode='bilinear', align_corners=True)
+        
     print('Evaluating, found ' + str(len(testloader)) + ' images.')
 
     data_list = []
@@ -159,17 +175,23 @@ def evaluate(model, dataset, ignore_label=250, save_output_images=False, save_di
     total_loss = []
 
     for index, batch in enumerate(testloader):
-        image, label, size, name, _ = batch
+        image, label, size, name = batch
         size = size[0]
         #if index > 500:
         #    break
         with torch.no_grad():
-            output  = model(Variable(image).cuda())
+            output  = model(image.cuda())
             output = interp(output)
 
-            label_cuda = Variable(label.long()).cuda()
+            label_cuda = label.long().cuda()
+            
+            if torch.all(label_cuda == ignore_label):
+                print(f"⚠️ Skipping batch {index} as all labels are ignore_index (-1)")
+                continue
+
             criterion = CrossEntropy2d(ignore_label=ignore_label).cuda()  # Ignore label ??
             loss = criterion(output, label_cuda)
+            
             total_loss.append(loss.item())
 
             output = output.cpu().data[0].numpy()
@@ -178,10 +200,12 @@ def evaluate(model, dataset, ignore_label=250, save_output_images=False, save_di
                 gt = np.asarray(label[0].numpy(), dtype=np.int)
             elif dataset == 'gta':
                 gt = np.asarray(label[0].numpy(), dtype=np.int)
-
+            elif dataset == 'loveda':
+                gt = np.asarray(label[0].numpy(), dtype=np.int32)
+            else:
+                gt = label
             output = output.transpose(1,2,0)
-            output = np.asarray(np.argmax(output, axis=2), dtype=np.int)
-
+            output = np.asarray(np.argmax(output, axis=2), dtype=np.int32)
             data_list.append([gt.flatten(), output.flatten()])
 
         if (index+1) % 100 == 0:

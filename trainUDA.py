@@ -157,6 +157,9 @@ class Learning_Rate_Object(object):
 
 def save_image(image, epoch, id, palette):
     with torch.no_grad():
+        visualize_dir = os.path.join(checkpoint_dir, "visualiseImages")
+        if os.path.exists(visualize_dir) == False:
+            os.makedirs(visualize_dir)
         if image.shape[0] == 3:
             restore_transform = transforms.Compose([
             DeNormalize(IMG_MEAN),
@@ -165,11 +168,12 @@ def save_image(image, epoch, id, palette):
 
             image = restore_transform(image)
             #image = PIL.Image.fromarray(np.array(image)[:, :, ::-1])  # BGR->RGB
-            image.save(os.path.join('../visualiseImages/', str(epoch)+ id + '.png'))
+            image.save(os.path.join(visualize_dir, f"epoch_{str(epoch)}_"+ id + '.png'))
         else:
             mask = image.numpy()
             colorized_mask = colorize_mask(mask, palette)
-            colorized_mask.save(os.path.join('../visualiseImages', str(epoch)+ id + '.png'))
+            
+            colorized_mask.save(os.path.join(visualize_dir, f"epoch_{str(epoch)}_"+ id + '.png'))
 
 def _save_checkpoint(iteration, model, optimizer, config, ema_model, save_best=False, overwrite=True):
     checkpoint = {
@@ -287,7 +291,17 @@ def main():
 
         #data_aug = Compose([RandomHorizontallyFlip()])
         train_dataset = data_loader(data_path, is_transform=True, augmentations=data_aug, img_size=input_size, img_mean = IMG_MEAN)
+    elif dataset == 'loveda':
+        data_loader = get_loader('loveda')
+        data_path = get_data_path('loveda')
+        if random_crop:
+            data_aug = Compose([RandomCrop_city(input_size)])
+        else:
+            data_aug = None
 
+        #data_aug = Compose([RandomHorizontallyFlip()])
+        train_dataset = data_loader(data_path, domain=config['source_domain'], split='Train',) 
+    
     train_dataset_size = len(train_dataset)
     print ('dataset size: ', train_dataset_size)
 
@@ -311,21 +325,21 @@ def main():
 
     #New loader for Domain transfer
     if True:
-        data_loader = get_loader('gta')
-        data_path = get_data_path('gta')
+        data_loader = get_loader('loveda')
+        data_path = get_data_path('loveda')
         if random_crop:
             data_aug = Compose([RandomCrop_gta(input_size)])
         else:
             data_aug = None
 
         #data_aug = Compose([RandomHorizontallyFlip()])
-        train_dataset = data_loader(data_path, list_path = './data/gta5_list/train.txt', augmentations=data_aug, img_size=(1280,720), mean=IMG_MEAN)
+        train_dataset = data_loader(data_path, domain=config['target_domain'], split='Train')
 
     trainloader = data.DataLoader(train_dataset,
                     batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
 
     trainloader_iter = iter(trainloader)
-    print('gta size:',len(trainloader))
+    print('LoveDA Adaptation size:',len(trainloader))
 
     #Load new data for domain_transfer
 
@@ -397,8 +411,8 @@ def main():
         labels = labels.cuda().long()
 
         #images, labels = weakTransform(weak_parameters, data = images, target = labels)
-
         pred = interp(model(images))
+
         L_l = loss_calc(pred, labels) # Cross entropy loss for labeled data
         #L_l = torch.Tensor([0.0]).cuda()
 
@@ -411,7 +425,7 @@ def main():
                 trainloader_remain_iter = iter(trainloader_remain)
                 batch_remain = next(trainloader_remain_iter)
 
-            images_remain, _, _, _, _ = batch_remain
+            images_remain, _, _, _= batch_remain
             images_remain = images_remain.cuda()
             inputs_u_w, _ = weakTransform(weak_parameters, data = images_remain)
             #inputs_u_w = inputs_u_w.clone()
@@ -509,8 +523,8 @@ def main():
         if ema_model is not None:
             alpha_teacher = 0.99
             ema_model = update_ema_variables(ema_model = ema_model, model = model, alpha_teacher=alpha_teacher, iteration=i_iter)
-
-        print('iter = {0:6d}/{1:6d}, loss_l = {2:.3f}, loss_u = {3:.3f}'.format(i_iter, num_iterations, loss_l_value, loss_u_value))
+        if i_iter % 100 == 0:
+            print('iter = {0:6d}/{1:6d}, loss_l = {2:.3f}, loss_u = {3:.3f}'.format(i_iter, num_iterations, loss_l_value, loss_u_value))
 
         if i_iter % save_checkpoint_every == 0 and i_iter!=0:
             if epochs_since_start * len(trainloader) < save_checkpoint_every:
@@ -537,9 +551,9 @@ def main():
 
         if i_iter % val_per_iter == 0 and i_iter != 0:
             model.eval()
-            if dataset == 'cityscapes':
-                mIoU, eval_loss = evaluate(model, dataset, ignore_label=250, input_size=(512,1024), save_dir=checkpoint_dir)
-
+            if dataset == 'loveda':
+                mIoU, eval_loss = evaluate(model, dataset, ignore_label=ignore_label, input_size=(512,1024), save_dir=checkpoint_dir)
+                print(f"Evaluate loss: {eval_loss}")
             model.train()
 
             if mIoU > best_mIoU and save_best_model:
@@ -552,17 +566,17 @@ def main():
 
         if save_unlabeled_images and train_unlabeled and i_iter % save_checkpoint_every == 0:
             # Saves two mixed images and the corresponding prediction
-            save_image(inputs_u_s[0].cpu(),i_iter,'input1',palette.CityScpates_palette)
-            save_image(inputs_u_s[1].cpu(),i_iter,'input2',palette.CityScpates_palette)
+            save_image(inputs_u_s[0].cpu(),i_iter,'input1',palette.LoveDA_palette)
+            save_image(inputs_u_s[1].cpu(),i_iter,'input2',palette.LoveDA_palette)
             _, pred_u_s = torch.max(logits_u_s, dim=1)
-            save_image(pred_u_s[0].cpu(),i_iter,'pred1',palette.CityScpates_palette)
-            save_image(pred_u_s[1].cpu(),i_iter,'pred2',palette.CityScpates_palette)
+            save_image(pred_u_s[0].cpu(),i_iter,'pred1',palette.LoveDA_palette)
+            save_image(pred_u_s[1].cpu(),i_iter,'pred2',palette.LoveDA_palette)
 
     _save_checkpoint(num_iterations, model, optimizer, config, ema_model)
 
     model.eval()
-    if dataset == 'cityscapes':
-        mIoU, val_loss = evaluate(model, dataset, ignore_label=250, input_size=(512,1024), save_dir=checkpoint_dir)
+    if dataset == 'loveda':
+        mIoU, val_loss = evaluate(model, dataset, ignore_label=ignore_label, input_size=(512,512), save_dir=checkpoint_dir)
     model.train()
     if mIoU > best_mIoU and save_best_model:
         best_mIoU = mIoU
@@ -592,9 +606,9 @@ if __name__ == '__main__':
 
 
     if config['pretrained'] == 'coco':
-        restore_from = 'http://vllab1.ucmerced.edu/~whung/adv-semi-seg/resnet101COCO-41f33a49.pth'
+        restore_from = 'checkpoint/DACSGTA5/best_model.pth'
 
-    num_classes=19
+    num_classes=7
     IMG_MEAN = np.array((104.00698793, 116.66876762, 122.67891434), dtype=np.float32)
 
     batch_size = config['training']['batch_size']
@@ -605,7 +619,6 @@ if __name__ == '__main__':
     input_size = (h, w)
 
     ignore_label = config['ignore_label'] 
-
     learning_rate = config['training']['learning_rate']
 
     optimizer_type = config['training']['optimizer']

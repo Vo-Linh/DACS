@@ -14,6 +14,7 @@ def get_loader(name):
         "cityscapes": cityscapesLoader,
         "gta": GTA5DataSet,
         "synthia": SynthiaDataSet,
+        "loveda":LoveDADataSet
     }[name]
 
 def get_data_path(name):
@@ -27,3 +28,5 @@ def get_data_path(name):
         return '../data/gta/'
     if name == 'synthia':
         return '../data/RAND_CITYSCAPES'
+    if name == 'loveda':
+        return '/home/Hung_Data/HungData/mmseg_data/Datasets/LoveDA/loveDA/'
